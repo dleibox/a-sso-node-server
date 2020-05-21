@@ -47,7 +47,7 @@ const router = express.Router();
 const controller = require('./controller');
 router.route('/login').get(controller.login).post(controller.doLogin);
 
-router.get('/verifytoken', controller.verifySsoToken);
+router.get('/verifykey', controller.verifySsoKey);
 
 router.get('/logout', controller.logout);
 

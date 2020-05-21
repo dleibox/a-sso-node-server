@@ -4,12 +4,13 @@ const Hashids = require('hashids/cjs');
 const hashids = new Hashids();
 
 // app token to validate the request is coming from the authenticated server only.
-const serverTokenDB = {
-    a_sso_server_token: '8888',
+const serverAuthTokenDB = {
+    a_sso_server_auth_token: '8888',
 };
 
 const alloweOrigin = {
     localhost: true,
+    'sso.localhost': true,
     'consumer.dlei.ca': true,
     'sso.dlei.ca': false,
 };
@@ -54,9 +55,9 @@ const storeApplicationInCache = (origin, id, intrmToken) => {
     fillIntrmTokenCache(origin, id, intrmToken);
 };
 
-const generatePayload = (ssoToken) => {
-    const globalSessionToken = intrmTokenCache[ssoToken][0];
-    // const appName = intrmTokenCache[ssoToken][1];
+const generatePayload = (ssoKey) => {
+    const globalSessionToken = intrmTokenCache[ssoKey][0];
+    // const appName = intrmTokenCache[ssoKey][1];
     const userEmail = sessionUser[globalSessionToken];
     const user = userDB[userEmail];
     // const appPolicy = user.appPolicy[appName];
@@ -108,36 +109,36 @@ function parseAuthHeader(hdrValue) {
     return matches && { scheme: matches[1], value: matches[2] };
 }
 
-const verifySsoToken = async (req, res, next) => {
+const verifySsoKey = async (req, res, next) => {
     const auth = req.headers[AUTH_HEADER];
-    let serverToken = null;
+    let serverAuthToken = null;
     if (auth) {
         const authParams = parseAuthHeader(auth);
         if (authParams && BEARER_AUTH_SCHEME === authParams.scheme.toLowerCase()) {
-            serverToken = authParams.value;
+            serverAuthToken = authParams.value;
 
-            console.log('---server_token---:', serverToken);
-            const { ssoToken } = req.query;
-            // if the application token is not present or ssoToken request is invalid
-            // if the ssoToken is not present in the cache some is
+            console.log('---server_auth_token---:', serverAuthToken);
+            const { ssoKey } = req.query;
+            // if the application token is not present or ssoKey request is invalid
+            // if the ssoKey is not present in the cache some is
             // smart.
-            if (!serverToken || !ssoToken || !intrmTokenCache[ssoToken]) {
+            if (!serverAuthToken || !ssoKey || !intrmTokenCache[ssoKey]) {
                 return res.status(400).json({ message: 'badRequest' });
             }
-            // if the serverToken is present and check if it's valid for the application
-            const [globalSessionToken, appName] = intrmTokenCache[ssoToken];
+            // if the serverAuthToken is present and check if it's valid for the application
+            const [globalSessionToken, appName] = intrmTokenCache[ssoKey];
 
-            // If the serverToken is not equal to token given during the sso app registraion or later stage than invalid
-            if (serverToken !== serverTokenDB['a_sso_server_token'] || sessionApp[globalSessionToken][appName] !== true) {
+            // If the serverAuthToken is not equal to token given during the sso app registraion or later stage than invalid
+            if (serverAuthToken !== serverAuthTokenDB['a_sso_server_auth_token'] || sessionApp[globalSessionToken][appName] !== true) {
                 return res.status(403).json({ message: 'Unauthorized' });
             }
 
             // checking if the token passed has been generated
-            const payload = generatePayload(ssoToken);
+            const payload = generatePayload(ssoKey);
             const token = await genJwtToken(payload);
             console.log('---app_token---:', token);
             // delete the itremCache key for no futher use,
-            // delete intrmTokenCache[ssoToken];
+            // delete intrmTokenCache[ssoKey];
             return res.status(200).json({ token });
         }
     }
@@ -164,7 +165,7 @@ const doLogin = (req, res, next) => {
     const url = new URL(appURL);
     const intrmid = encodedId();
     storeApplicationInCache(url.origin, id, intrmid);
-    res.redirect(302, `${appURL}?ssoToken=${intrmid}`);
+    res.redirect(302, `${appURL}?ssoKey=${intrmid}`);
 };
 
 const login = (req, res, next) => {
@@ -188,7 +189,7 @@ const login = (req, res, next) => {
         console.log('---', req.cookies.sso_token, intrmTokenCache);
         const intrmid = Object.keys(intrmTokenCache).find((_) => intrmTokenCache[_][0] === req.cookies.sso_token);
         if (intrmid) {
-            return res.redirect(302, `${appURL}?ssoToken=${intrmid}`);
+            return res.redirect(302, `${appURL}?ssoKey=${intrmid}`);
         }
     }
     return res.render('login', {
@@ -201,4 +202,4 @@ const logout = (req, res, next) => {
     res.redirect('/');
 };
 
-module.exports = Object.assign({}, { doLogin, login, verifySsoToken, logout });
+module.exports = Object.assign({}, { doLogin, login, verifySsoKey, logout });
