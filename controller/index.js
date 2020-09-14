@@ -10,6 +10,7 @@ const serverAuthTokenDB = {
 
 const alloweOrigin = {
     localhost: true,
+    'dev.localhost': true,
     'sso.localhost': true,
     'consumer.dlei.ca': true,
     'sso.dlei.ca': false,
